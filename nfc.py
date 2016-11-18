@@ -3,14 +3,14 @@
 # ReadNFC
 # Thomas Baer
 
-import logging
-import logging.handlers
 import httplib
-import time
+import logging.handlers
 import re
+import time
 
-import nxppy
 import RPi.GPIO as GPIO
+import nxppy
+import paho.mqtt.client as mqtt
 
 LOG_FILENAME = "/var/log/nfc.log"
 LOG_LEVEL = logging.INFO
@@ -30,6 +30,18 @@ formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+
+def on_connect(client, userdata, flags, rc):
+    logger.info("Connected with result code " + str(rc))
+
+
+client = mqtt.Client()
+client.on_connect = on_connect
+
+client.connect("192.168.88.13", 1883, 60)
+client.loop_start()
+
+
 def blinkled(led, duration, piep):
     GPIO.output(led, ON)
     if piep:
@@ -38,6 +50,7 @@ def blinkled(led, duration, piep):
     GPIO.output(led, OFF)
     if piep:
         GPIO.output(PIEP, OFF)
+
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -59,6 +72,7 @@ while True:
         print(uid1)
         if uid1 is not None:
             logger.info("Chip read:" + uid1)
+            client.publish("nfc/read", uid1)
             conn = httplib.HTTPConnection(SERVER, 80, timeout=5)
             conn.request("GET", URI + uid1)
             r = conn.getresponse()
@@ -73,4 +87,3 @@ while True:
                     for i in range(0, 6):
                         blinkled(RED, 0.02, True)
                         time.sleep(0.05)
-
